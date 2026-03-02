@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>亲友纪念日管理 - 紧凑看板版</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.js"></script>
+    <style>
+        [v-cloak] { display: none; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900 font-sans">
+
+<div id="app" v-cloak class="p-4 md:p-8 max-w-[1400px] mx-auto">
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <div>
+            <h1 class="text-2xl font-black tracking-tight text-slate-800 flex items-center gap-2">
+                <span class="bg-blue-600 text-white p-1.5 rounded-lg text-lg">📅</span>
+                亲友纪念日管理
+            </h1>
+            <p class="text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">Efficiency Dashboard</p>
+        </div>
+
+        <div class="flex items-center gap-3 bg-white shadow-sm border border-slate-200 p-2 rounded-2xl">
+            <div class="px-3 border-r border-slate-100 flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-400">跨度</span>
+                <input type="number" v-model="config.years" class="w-9 font-black text-blue-600 outline-none">
+                <span class="text-xs font-bold text-slate-400">年</span>
+            </div>
+            <button @click="addEvent" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
+                <span>+</span> 添加
+            </button>
+            <button @click="exportICS" class="bg-slate-800 hover:bg-black text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-lg shadow-slate-200">
+                导出 .ics
+            </button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div v-for="(item, index) in events" :key="index"
+             class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col relative group overflow-hidden">
+
+            <div class="flex items-center justify-between p-3 border-b border-slate-50">
+                <div class="flex bg-slate-100 p-1 rounded-lg">
+                    <button @click="item.isLunar = true" :class="item.isLunar ? 'bg-white shadow-sm text-orange-600' : 'text-slate-400'" class="text-[10px] px-2 py-0.5 rounded-md font-bold transition-all">农历</button>
+                    <button @click="item.isLunar = false" :class="!item.isLunar ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'" class="text-[10px] px-2 py-0.5 rounded-md font-bold transition-all">公历</button>
+                </div>
+                <button @click="removeEvent(index)" class="text-slate-300 hover:text-red-500 transition-colors p-1">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div class="p-4 space-y-3">
+                <input type="text" v-model="item.name" placeholder="姓名/事项" class="text-base font-bold bg-transparent border-b border-dashed border-slate-200 focus:border-blue-500 outline-none w-full pb-1">
+
+                <div class="flex items-center gap-2">
+                    <div class="flex-1 flex items-center gap-1 bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-100">
+                        <select v-model="item.month" class="bg-transparent text-sm font-bold outline-none flex-grow">
+                            <option v-for="m in 12" :value="m">{{m}}月</option>
+                        </select>
+                        <select v-model="item.day" class="bg-transparent text-sm font-bold outline-none flex-grow">
+                            <option v-for="d in 31" :value="d">{{d}}日</option>
+                        </select>
+                    </div>
+                </div>
+
+                <input v-model="item.note" placeholder="备注..." class="w-full text-xs bg-slate-50 rounded-lg px-3 py-2 outline-none border border-transparent focus:bg-white focus:border-slate-100">
+            </div>
+
+            <div class="mt-auto bg-slate-50/50 border-t border-slate-100 p-3 grid grid-cols-3 gap-2">
+                <button @click="item.reminders.sevenDays = !item.reminders.sevenDays"
+                        :class="item.reminders.sevenDays ? 'bg-orange-100 border-orange-200 text-orange-700' : 'bg-white border-slate-200 text-slate-400 opacity-60'"
+                        class="flex flex-col items-center justify-center p-2 rounded-xl border transition-all hover:scale-105">
+                    <span class="text-lg">📦</span>
+                    <span class="text-[9px] font-black uppercase mt-1">7D Prep</span>
+                </button>
+
+                <button @click="item.reminders.oneDay = !item.reminders.oneDay"
+                        :class="item.reminders.oneDay ? 'bg-blue-100 border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-400 opacity-60'"
+                        class="flex flex-col items-center justify-center p-2 rounded-xl border transition-all hover:scale-105">
+                    <span class="text-lg">⏰</span>
+                    <span class="text-[9px] font-black uppercase mt-1">Eve 20:00</span>
+                </button>
+
+                <div :class="item.reminders.dayOf ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-400 opacity-60'"
+                     class="flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all relative">
+                    <input type="checkbox" v-model="item.reminders.dayOf" class="absolute inset-0 opacity-0 cursor-pointer z-10">
+                    <span class="text-lg">🎂</span>
+                    <select v-if="item.reminders.dayOf" v-model="item.reminders.dayOfHour" class="text-[10px] font-black bg-transparent outline-none relative z-20">
+                        <option v-for="h in 24" :value="h-1">{{(h-1).toString().padStart(2, '0')}}:00</option>
+                    </select>
+                    <span v-else class="text-[9px] font-black uppercase mt-1">Day Of</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-12 text-center text-slate-400">
+        <p class="text-xs font-bold uppercase tracking-widest border-t border-slate-200 pt-8 inline-block px-10">
+            💡 Tip: 📦 7D Prep 模式会额外生成一个影子日程，完美解决 iOS 2个提醒的限制
+        </p>
+    </footer>
+</div>
+
+<script>
+    const { createApp, ref, reactive } = Vue;
+
+    createApp({
+        setup() {
+            const config = reactive({ years: 10 });
+            // 默认数据
+            const events = ref([
+                { name: '老妈生日', isLunar: true, month: 5, day: 20, note: '买束花', reminders: { sevenDays: true, oneDay: true, dayOf: true, dayOfHour: 9 } },
+                { name: '结婚纪念日', isLunar: false, month: 10, day: 5, note: '提前订位', reminders: { sevenDays: true, oneDay: true, dayOf: true, dayOfHour: 19 } },
+                { name: '老爸生日', isLunar: true, month: 1, day: 15, note: '', reminders: { sevenDays: false, oneDay: true, dayOf: true, dayOfHour: 10 } }
+            ]);
+
+            const addEvent = () => {
+                events.value.unshift({ name: '', isLunar: true, month: 1, day: 1, note: '', reminders: { sevenDays: false, oneDay: true, dayOf: true, dayOfHour: 9 } });
+            };
+            const removeEvent = (index) => events.value.splice(index, 1);
+            const getDayStr = (solar) => solar.toYmd().replace(/-/g, '');
+
+            const exportICS = () => {
+                let ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//SmartHome//Dashboard//CN','X-WR-CALNAME:智能家庭看板','X-WR-TIMEZONE:Asia/Shanghai','CALSCALE:GREGORIAN'];
+                const currentYear = new Date().getFullYear();
+
+                events.value.forEach(item => {
+                    for (let y = currentYear; y < currentYear + config.years; y++) {
+                        try {
+                            let solar;
+                            let lunarStr = "";
+                            if (item.isLunar) {
+                                const lunar = Lunar.fromYmd(y, item.month, item.day);
+                                solar = lunar.getSolar();
+                                lunarStr = `农历：${lunar.toString()}`;
+                            } else {
+                                solar = Solar.fromYmd(y, item.month, item.day);
+                                lunarStr = `公历纪念日`;
+                            }
+
+                            const dateStr = getDayStr(solar);
+                            const nextDateStr = getDayStr(solar.next(1));
+                            const baseUID = `ev_${Date.now()}_${y}_${Math.random().toString(36).substr(2, 5)}`;
+
+                            // 1. 影子日程 (7天前)
+                            if (item.reminders.sevenDays) {
+                                const prepSolar = solar.next(-7);
+                                ics.push('BEGIN:VEVENT', `UID:prep_${baseUID}@ai`, `SUMMARY:📦 准备：${item.name}还有一周`, `DTSTART;VALUE=DATE:${getDayStr(prepSolar)}`, `DTEND;VALUE=DATE:${getDayStr(prepSolar.next(1))}`, `DESCRIPTION:【影子日程】提醒您距离 ${item.name} 还有7天。\\n目标日期：${solar.toYmd()}`, 'BEGIN:VALARM', 'TRIGGER:PT9H', 'ACTION:DISPLAY', `DESCRIPTION:7天预警：${item.name}`, 'END:VALARM', 'END:VEVENT');
+                            }
+
+                            // 2. 主日程
+                            ics.push('BEGIN:VEVENT', `UID:main_${baseUID}@ai`, `SUMMARY:${item.isLunar ? '🎂' : '💍'} ${item.name}`, `DTSTART;VALUE=DATE:${dateStr}`, `DTEND;VALUE=DATE:${nextDateStr}`, `DESCRIPTION:${lunarStr}\\n备注：${item.note || '无'}`);
+                            if (item.reminders.oneDay) ics.push('BEGIN:VALARM', 'TRIGGER:-PT4H', 'ACTION:DISPLAY', `DESCRIPTION:明天是：${item.name}`, 'END:VALARM');
+                            if (item.reminders.dayOf) ics.push('BEGIN:VALARM', `TRIGGER:PT${item.reminders.dayOfHour}H`, 'ACTION:DISPLAY', `DESCRIPTION:今天：${item.name}`, 'END:VALARM');
+                            ics.push('END:VEVENT');
+                        } catch (e) {}
+                    }
+                });
+                ics.push('END:VCALENDAR');
+                const blob = new Blob([ics.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = `smart_dashboard.ics`;
+                link.click();
+            };
+
+            return { config, events, addEvent, removeEvent, exportICS };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
